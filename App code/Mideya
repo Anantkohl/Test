@@ -1,0 +1,1135 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ApexStream - MX & MovieBox Pro Web Player</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: '#00d2ff',
+            brandDark: '#0072ff',
+            neonOrange: '#ff6a00',
+            oled: '#0a0a0c',
+            surface: '#141418',
+            surfaceLighter: '#1f1f26'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #0c0d12; }
+    ::-webkit-scrollbar-thumb { background: #2b2e3b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00d2ff; }
+
+    /* Video player sizing & aspect ratios */
+    .aspect-fit { object-fit: contain; }
+    .aspect-fill { object-fit: cover; }
+    .aspect-stretch { object-fit: fill; }
+    .aspect-16-9 { aspect-ratio: 16/9; object-fit: cover; }
+
+    /* Custom range sliders */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 9999px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 14px;
+      width: 14px;
+      border-radius: 50%;
+      background: #00d2ff;
+      box-shadow: 0 0 10px rgba(0, 210, 255, 0.8);
+      cursor: pointer;
+    }
+
+    /* Video Progress Slider */
+    .progress-bar-container:hover .progress-scrub-thumb {
+      transform: scale(1.3);
+      opacity: 1;
+    }
+
+    /* Glassmorphism helpers */
+    .glass-panel {
+      background: rgba(18, 18, 24, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .sheet-up {
+      transform: translateY(0%);
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .sheet-down {
+      transform: translateY(105%);
+      transition: transform 0.22s ease-in;
+    }
+
+    /* Fullscreen layout lock */
+    #playerContainer:fullscreen,
+    #playerContainer:-webkit-full-screen {
+      width: 100vw !important;
+      height: 100vh !important;
+      max-width: 100vw !important;
+      border-radius: 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      background: #000;
+    }
+
+    /* Pulsing animations */
+    @keyframes ping-slow {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 0.3; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .animate-pulse-glow {
+      animation: ping-slow 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-oled text-gray-100 font-sans min-h-screen flex flex-col select-none antialiased">
+
+  <!-- Top App Navigation Bar -->
+  <header class="w-full glass-panel sticky top-0 z-40 px-4 py-2.5 flex items-center justify-between border-b border-white/10">
+    <div class="flex items-center space-x-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brandDark to-brand flex items-center justify-center text-black font-extrabold shadow-lg shadow-cyan-500/20">
+        <i class="fa-solid fa-play text-sm"></i>
+      </div>
+      <div>
+        <h1 class="text-base sm:text-lg font-bold tracking-tight bg-gradient-to-r from-white via-gray-200 to-brand bg-clip-text text-transparent">ApexStream <span class="text-xs px-1.5 py-0.5 rounded bg-brand/20 text-brand font-medium">PRO</span></h1>
+        <p class="text-[10px] text-gray-400 font-medium">MX & MovieBox Engine</p>
+      </div>
+    </div>
+
+    <!-- Right Quick Actions -->
+    <div class="flex items-center space-x-2">
+      <!-- Open Local File -->
+      <label class="cursor-pointer bg-surfaceLighter hover:bg-white/10 text-xs px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-1.5 transition active:scale-95 text-gray-300 hover:text-white">
+        <i class="fa-regular fa-folder-open text-brand"></i>
+        <span class="hidden sm:inline">Open File</span>
+        <input type="file" id="localFileInput" accept="video/*,.mkv,.mp4,.webm" class="hidden">
+      </label>
+
+      <!-- URL Input Toggle -->
+      <button onclick="toggleUrlModal()" class="bg-surfaceLighter hover:bg-white/10 text-xs px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-1.5 transition active:scale-95 text-gray-300 hover:text-white">
+        <i class="fa-solid fa-link text-neonOrange"></i>
+        <span class="hidden sm:inline">Stream URL</span>
+      </button>
+
+      <!-- Subtitle File Loader -->
+      <label class="cursor-pointer bg-surfaceLighter hover:bg-white/10 text-xs px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-1.5 transition active:scale-95 text-gray-300 hover:text-white" title="Load .srt or .vtt Subtitles">
+        <i class="fa-solid fa-closed-captioning text-green-400"></i>
+        <span class="hidden md:inline">Subtitle</span>
+        <input type="file" id="subtitleFileInput" accept=".vtt,.srt" class="hidden">
+      </label>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 w-full max-w-7xl mx-auto p-2 sm:p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- LEFT: Video Theatre Column (8 cols on desktop) -->
+    <div class="lg:col-span-8 flex flex-col space-y-3">
+      
+      <!-- Video Player Wrapper (Responsive & Fullscreen target) -->
+      <div id="playerContainer" class="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 group select-none">
+        
+        <!-- Video Element -->
+        <video id="mainVideo" class="w-full h-full aspect-fit transition-all duration-200" playsinline preload="metadata">
+          <source id="videoSource" src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4">
+          <track id="mainTrack" label="English" kind="subtitles" srclang="en" default>
+          Your browser doesn't support HTML5 video.
+        </video>
+
+        <!-- SUBTITLES OVERLAY CONTAINER -->
+        <div id="customSubtitleBox" class="absolute bottom-16 inset-x-4 text-center pointer-events-none z-20 text-white font-semibold text-sm sm:text-base md:text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] bg-black/60 px-3 py-1 rounded max-w-max mx-auto hidden transition-opacity"></div>
+
+        <!-- GESTURE INTERACTION SURFACE (Taps, Swipes, Longpress) -->
+        <div id="gestureSurface" class="absolute inset-0 z-10 cursor-pointer"></div>
+
+        <!-- ==================== FLOATING HUDS ==================== -->
+        <!-- 1. Hold-for-2X Speed Badge -->
+        <div id="hold2XBadge" class="absolute top-5 left-1/2 -translate-x-1/2 bg-black/85 text-yellow-400 border border-yellow-400/60 px-4 py-1.5 rounded-full text-xs sm:text-sm font-bold flex items-center gap-2 shadow-xl pointer-events-none z-30 hidden animate-pulse">
+          <i class="fa-solid fa-forward-fast text-xs"></i> 2.0X SPEED
+        </div>
+
+        <!-- 2. Left / Right Double-Tap Seek Ripples -->
+        <div id="leftSeekRipple" class="absolute left-6 top-1/2 -translate-y-1/2 bg-white/10 backdrop-blur-md text-white border border-white/20 px-5 py-3 rounded-full text-sm font-bold items-center gap-2 pointer-events-none z-30 hidden shadow-2xl">
+          <i class="fa-solid fa-backward"></i> -10s
+        </div>
+        <div id="rightSeekRipple" class="absolute right-6 top-1/2 -translate-y-1/2 bg-white/10 backdrop-blur-md text-white border border-white/20 px-5 py-3 rounded-full text-sm font-bold items-center gap-2 pointer-events-none z-30 hidden shadow-2xl">
+          +10s <i class="fa-solid fa-forward"></i>
+        </div>
+
+        <!-- 3. Brightness Swipe HUD (Left side) -->
+        <div id="brightnessHud" class="absolute left-6 top-1/2 -translate-y-1/2 glass-panel px-3.5 py-4 rounded-2xl flex flex-col items-center gap-3 pointer-events-none z-30 hidden shadow-2xl border border-white/20 min-w-[55px]">
+          <i id="brightIcon" class="fa-regular fa-sun text-yellow-300 text-base"></i>
+          <div class="w-1.5 h-24 bg-white/20 rounded-full overflow-hidden flex flex-col justify-end">
+            <div id="brightBarFill" class="w-full bg-yellow-400 transition-all duration-75" style="height: 70%;"></div>
+          </div>
+          <span id="brightValText" class="text-[11px] font-bold text-white tracking-wider">70%</span>
+        </div>
+
+        <!-- 4. Volume Swipe HUD (Right side) -->
+        <div id="volumeHud" class="absolute right-6 top-1/2 -translate-y-1/2 glass-panel px-3.5 py-4 rounded-2xl flex flex-col items-center gap-3 pointer-events-none z-30 hidden shadow-2xl border border-white/20 min-w-[55px]">
+          <i id="volumeIcon" class="fa-solid fa-volume-high text-brand text-base"></i>
+          <div class="w-1.5 h-24 bg-white/20 rounded-full overflow-hidden flex flex-col justify-end">
+            <div id="volumeBarFill" class="w-full bg-brand transition-all duration-75" style="height: 100%;"></div>
+          </div>
+          <span id="volumeValText" class="text-[11px] font-bold text-white tracking-wider">100%</span>
+        </div>
+
+        <!-- 5. Screen Lock Overlay Banner -->
+        <div id="lockStateBanner" class="absolute top-5 left-5 z-40 hidden">
+          <button onclick="toggleScreenLock()" class="bg-red-500/90 hover:bg-red-600 text-white p-2.5 rounded-full shadow-lg flex items-center justify-center transition active:scale-90 border border-white/20" title="Tap to unlock screen">
+            <i class="fa-solid fa-lock text-sm"></i>
+          </button>
+        </div>
+
+        <!-- ==================== MX PLAYER CONTROLS OVERLAY ==================== -->
+        <div id="controlsOverlay" class="absolute inset-0 z-20 flex flex-col justify-between p-3 sm:p-5 bg-gradient-to-t from-black/90 via-transparent to-black/75 transition-opacity duration-300 pointer-events-auto">
+          
+          <!-- Top Row Controls -->
+          <div class="flex items-center justify-between text-white">
+            <div class="flex items-center space-x-2.5 truncate max-w-[70%]">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-brand/20 text-brand border border-brand/30 uppercase">HD</span>
+              <span id="videoTitleDisplay" class="font-semibold text-sm sm:text-base truncate drop-shadow">Big Buck Bunny (2008 Open Movie)</span>
+            </div>
+
+            <!-- Top Right Player Tools -->
+            <div class="flex items-center space-x-2 sm:space-x-3 text-xs sm:text-sm">
+              <!-- Aspect Ratio Cycle Button -->
+              <button onclick="cycleAspectRatio()" class="hover:text-brand transition p-1.5" title="Toggle Aspect Ratio (Fit, Fill, Stretch)">
+                <i class="fa-solid fa-expand"></i>
+                <span id="aspectRatioLabel" class="text-[10px] uppercase font-bold ml-0.5 text-gray-300">Fit</span>
+              </button>
+              
+              <!-- Screen Lock Button -->
+              <button onclick="toggleScreenLock()" class="hover:text-red-400 transition p-1.5" title="Lock Touch Screen">
+                <i class="fa-solid fa-lock-open"></i>
+              </button>
+
+              <!-- Sleep Timer Toggle -->
+              <button onclick="cycleSleepTimer()" class="hover:text-yellow-400 transition p-1.5 flex items-center gap-1" title="Sleep Timer">
+                <i class="fa-regular fa-clock"></i>
+                <span id="sleepTimerBadge" class="text-[10px] hidden font-mono text-yellow-300">OFF</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Center Big Play/Pause & Seek Cluster (MovieBox Style) -->
+          <div class="flex items-center justify-center space-x-6 sm:space-x-10 text-white">
+            <button onclick="seekOffset(-10)" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition active:scale-90 border border-white/10" title="Rewind 10s">
+              <i class="fa-solid fa-rotate-left text-sm sm:text-base"></i>
+            </button>
+            
+            <button id="centerPlayBtn" onclick="togglePlayPause()" class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-brandDark to-brand text-black flex items-center justify-center shadow-lg shadow-cyan-500/30 transition transform hover:scale-105 active:scale-95" title="Play/Pause">
+              <i id="centerPlayIcon" class="fa-solid fa-play text-xl sm:text-2xl ml-0.5"></i>
+            </button>
+
+            <button onclick="seekOffset(10)" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition active:scale-90 border border-white/10" title="Forward 10s">
+              <i class="fa-solid fa-rotate-right text-sm sm:text-base"></i>
+            </button>
+          </div>
+
+          <!-- Bottom Row: Timeline + Action Buttons -->
+          <div class="flex flex-col space-y-1.5 text-white">
+            
+            <!-- Video Progress Bar with Scrub Hover -->
+            <div class="progress-bar-container relative w-full h-4 flex items-center cursor-pointer group/bar" id="progressBarTrack">
+              <div class="w-full h-1 bg-white/25 rounded-full overflow-hidden relative group-hover/bar:h-2 transition-all">
+                <!-- Buffer fill -->
+                <div id="bufferFill" class="absolute top-0 left-0 h-full bg-white/30 rounded-full" style="width: 0%;"></div>
+                <!-- Playback fill -->
+                <div id="progressFill" class="absolute top-0 left-0 h-full bg-gradient-to-r from-brand to-brandDark rounded-full" style="width: 0%;"></div>
+              </div>
+              <!-- Scrub Knob -->
+              <div id="scrubKnob" class="progress-scrub-thumb absolute w-3.5 h-3.5 bg-brand rounded-full shadow-md -translate-x-1/2 pointer-events-none transition-transform opacity-0 group-hover/bar:opacity-100" style="left: 0%;"></div>
+            </div>
+
+            <!-- Lower Action Bar -->
+            <div class="flex items-center justify-between text-xs sm:text-sm pt-1">
+              
+              <!-- Left side: Time Display & Speed Pill -->
+              <div class="flex items-center space-x-3">
+                <div class="font-mono text-[11px] sm:text-xs text-gray-300">
+                  <span id="curTimeDisplay">00:00</span> / <span id="durTimeDisplay">00:00</span>
+                </div>
+
+                <!-- Live Speed Indicator Pill (Image 1 replica - click opens sheet) -->
+                <button onclick="openSpeedSheet()" class="px-2.5 py-0.5 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-[11px] font-semibold flex items-center gap-1 transition active:scale-95" title="Adjust playback speed">
+                  <i class="fa-solid fa-bolt text-yellow-400 text-[10px]"></i>
+                  <span id="currentSpeedLabel">1.0x</span>
+                </button>
+              </div>
+
+              <!-- Right side: PiP, Equalizer, Fullscreen -->
+              <div class="flex items-center space-x-2 sm:space-x-4">
+                <!-- Subtitle Toggle -->
+                <button onclick="toggleSubtitles()" id="subBtn" class="hover:text-brand transition p-1 text-gray-300" title="Toggle Subtitles">
+                  <i class="fa-regular fa-closed-captioning text-base"></i>
+                </button>
+
+                <!-- PiP Button -->
+                <button onclick="togglePictureInPicture()" id="pipActionBtn" class="hover:text-brand transition p-1 text-gray-300" title="Picture in Picture">
+                  <i class="fa-solid fa-clone text-base"></i>
+                </button>
+
+                <!-- True Fullscreen Button -->
+                <button onclick="toggleProFullscreen()" class="hover:text-brand transition p-1 text-gray-300" title="Toggle Fullscreen">
+                  <i id="fsIcon" class="fa-solid fa-expand text-base"></i>
+                </button>
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- ==================== SPEED BOTTOM SHEET (Image 2 style) ==================== -->
+        <div id="speedSheetBackdrop" class="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-end justify-center transition-opacity" onclick="closeSpeedSheet(event)">
+          <div class="w-full max-w-lg bg-surface border-t border-white/15 rounded-t-3xl p-5 text-white shadow-2xl sheet-up" onclick="event.stopPropagation()">
+            <!-- Drag Indicator Handle -->
+            <div class="w-10 h-1 bg-white/25 rounded-full mx-auto mb-3 cursor-pointer" onclick="closeSpeedSheet()"></div>
+            
+            <div class="flex items-center justify-between mb-4">
+              <span class="text-xs uppercase font-bold text-gray-400 tracking-wider">Playback Speed</span>
+              <span id="sheetSpeedVal" class="text-xl font-black text-brand font-mono">1.00x</span>
+              <button onclick="closeSpeedSheet()" class="text-gray-400 hover:text-white text-xs px-2 py-1 rounded bg-white/5">Done</button>
+            </div>
+
+            <!-- Stepper and Slider Row -->
+            <div class="flex items-center space-x-3 mb-5">
+              <button onclick="nudgeSpeed(-0.05)" class="w-10 h-10 rounded-full bg-surfaceLighter hover:bg-white/20 active:scale-95 flex items-center justify-center font-bold text-lg text-white border border-white/10">−</button>
+              <div class="flex-1 flex items-center">
+                <input type="range" id="speedSlider" min="0.25" max="2.5" step="0.05" value="1.0" class="w-full h-1.5 cursor-pointer" oninput="onSpeedSliderInput(this.value)">
+              </div>
+              <button onclick="nudgeSpeed(0.05)" class="w-10 h-10 rounded-full bg-surfaceLighter hover:bg-white/20 active:scale-95 flex items-center justify-center font-bold text-lg text-white border border-white/10">+</button>
+            </div>
+
+            <!-- Quick Speed Pills Grid -->
+            <div class="grid grid-cols-5 gap-2 text-xs">
+              <button onclick="selectSpeedPreset(0.25)" class="speed-pill py-2 rounded-xl bg-surfaceLighter hover:bg-white/15 text-gray-300 font-semibold border border-white/5">0.25</button>
+              <button onclick="selectSpeedPreset(0.5)" class="speed-pill py-2 rounded-xl bg-surfaceLighter hover:bg-white/15 text-gray-300 font-semibold border border-white/5">0.5</button>
+              <button onclick="selectSpeedPreset(0.75)" class="speed-pill py-2 rounded-xl bg-surfaceLighter hover:bg-white/15 text-gray-300 font-semibold border border-white/5">0.75</button>
+              <button onclick="selectSpeedPreset(1.0)" class="speed-pill py-2 rounded-xl bg-brand text-black font-bold border border-brand shadow-lg shadow-brand/20">
+                1.0<br><span class="text-[9px] font-normal opacity-80">Normal</span>
+              </button>
+              <button onclick="selectSpeedPreset(1.25)" class="speed-pill py-2 rounded-xl bg-surfaceLighter hover:bg-white/15 text-gray-300 font-semibold border border-white/5">1.25</button>
+
+              <button onclick="selectSpeedPreset(1.5)" class="speed-pill py-2 rounded-xl bg-surfaceLighter hover:bg-white/15 text-gray-300 font-semibold border border-white/5">1.5</button>
+              <button onclick="selectSpeedPreset(1.75)" class="speed-pill py-2 rounded-xl bg-surfaceLighter hover:bg-white/15 text-gray-300 font-semibold border border-white/5">1.75</button>
+              <button onclick="selectSpeedPreset(2.0)" class="speed-pill py-2 rounded-xl bg-surfaceLighter hover:bg-white/15 text-gray-300 font-semibold border border-white/5">2.0</button>
+              <button onclick="selectSpeedPreset(2.25)" class="speed-pill py-2 rounded-xl bg-surfaceLighter hover:bg-white/15 text-gray-300 font-semibold border border-white/5">2.25</button>
+              <button onclick="selectSpeedPreset(2.5)" class="speed-pill py-2 rounded-xl bg-surfaceLighter hover:bg-white/15 text-gray-300 font-semibold border border-white/5">2.5</button>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /Player Container -->
+
+      <!-- Video Meta Details Bar -->
+      <div class="glass-panel p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-white/10">
+        <div>
+          <h2 id="videoMetaHeading" class="text-base sm:text-lg font-bold text-white">Big Buck Bunny (2008)</h2>
+          <div class="flex items-center gap-2 mt-1 text-xs text-gray-400">
+            <span class="text-brand font-medium"><i class="fa-solid fa-circle-check text-[10px]"></i> Blender Open Movie</span>
+            <span>•</span>
+            <span id="metaResBadge">Full HD 1080p</span>
+            <span>•</span>
+            <span>Stereo AAC</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Audio Boost / Bass Toggle -->
+          <button onclick="toggleAudioBoost()" id="audioBoostBtn" class="px-3 py-1.5 rounded-xl bg-surfaceLighter hover:bg-white/15 border border-white/10 text-xs text-gray-300 flex items-center gap-1.5 transition active:scale-95">
+            <i class="fa-solid fa-sliders text-neonOrange"></i>
+            <span>Bass Boost: <b id="bassBoostText" class="text-white font-normal">Off</b></span>
+          </button>
+          
+          <!-- Bookmark / Resume status -->
+          <div class="text-[11px] text-gray-400 bg-white/5 px-2.5 py-1.5 rounded-lg border border-white/5">
+            <i class="fa-solid fa-floppy-disk text-gray-400 mr-1"></i> Auto-Resume Active
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: MovieBox Style Playlist & Media Hub (4 cols) -->
+    <div class="lg:col-span-4 flex flex-col space-y-4">
+      
+      <!-- Playlist Header -->
+      <div class="glass-panel p-4 rounded-2xl border border-white/10 flex flex-col h-full">
+        <div class="flex items-center justify-between mb-3 border-b border-white/10 pb-3">
+          <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-list-ul text-brand"></i>
+            <h3 class="font-bold text-sm tracking-wide text-white uppercase">MovieBox Library</h3>
+          </div>
+          <span id="playlistCount" class="text-xs bg-white/10 text-brand px-2 py-0.5 rounded-full font-mono">4 Videos</span>
+        </div>
+
+        <!-- Video Item List -->
+        <div id="playlistContainer" class="flex-1 overflow-y-auto max-h-[500px] space-y-2.5 pr-1">
+          <!-- Items injected via JS -->
+        </div>
+
+        <!-- Custom Link Streamer Bar -->
+        <div class="mt-4 pt-3 border-t border-white/10">
+          <p class="text-[11px] text-gray-400 mb-2">Have a direct MP4 / WebM stream URL?</p>
+          <div class="flex items-center gap-1.5">
+            <input type="text" id="quickUrlInput" placeholder="Paste media URL here..." class="flex-1 bg-surfaceLighter border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand">
+            <button onclick="loadFromInputUrl()" class="bg-brand hover:bg-brandDark text-black font-bold text-xs px-3.5 py-2 rounded-xl transition active:scale-95">Play</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- URL Modal -->
+  <div id="urlModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-surface border border-white/15 p-6 rounded-2xl max-w-md w-full shadow-2xl">
+      <h3 class="text-base font-bold text-white mb-2 flex items-center gap-2">
+        <i class="fa-solid fa-satellite-dish text-brand"></i> Online Stream Video URL
+      </h3>
+      <p class="text-xs text-gray-400 mb-4">Enter any direct MP4, MKV or WebM online file link to stream directly with all MX gestures & speed features.</p>
+      <input type="text" id="modalUrlInput" placeholder="https://domain.com/video.mp4" class="w-full bg-oled border border-white/15 rounded-xl px-3.5 py-2.5 text-sm text-white mb-4 focus:outline-none focus:border-brand">
+      <div class="flex justify-end gap-2">
+        <button onclick="toggleUrlModal()" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold">Cancel</button>
+        <button onclick="submitModalUrl()" class="px-4 py-2 rounded-xl bg-brand text-black font-bold text-xs hover:bg-brandDark transition">Stream Now</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* =========================================================
+       APEXSTREAM - MX PLAYER & MOVIEBOX PRO ENGINE SCRIPT
+       ========================================================= */
+
+    // DOM References
+    const video = document.getElementById('mainVideo');
+    const playerContainer = document.getElementById('playerContainer');
+    const gestureSurface = document.getElementById('gestureSurface');
+    const controlsOverlay = document.getElementById('controlsOverlay');
+    const videoSource = document.getElementById('videoSource');
+    const centerPlayBtn = document.getElementById('centerPlayBtn');
+    const centerPlayIcon = document.getElementById('centerPlayIcon');
+    const progressFill = document.getElementById('progressFill');
+    const bufferFill = document.getElementById('bufferFill');
+    const scrubKnob = document.getElementById('scrubKnob');
+    const progressBarTrack = document.getElementById('progressBarTrack');
+    const curTimeDisplay = document.getElementById('curTimeDisplay');
+    const durTimeDisplay = document.getElementById('durTimeDisplay');
+    const currentSpeedLabel = document.getElementById('currentSpeedLabel');
+    const sheetSpeedVal = document.getElementById('sheetSpeedVal');
+    const speedSlider = document.getElementById('speedSlider');
+    const speedSheetBackdrop = document.getElementById('speedSheetBackdrop');
+    const hold2XBadge = document.getElementById('hold2XBadge');
+    const leftSeekRipple = document.getElementById('leftSeekRipple');
+    const rightSeekRipple = document.getElementById('rightSeekRipple');
+    const brightnessHud = document.getElementById('brightnessHud');
+    const brightBarFill = document.getElementById('brightBarFill');
+    const brightValText = document.getElementById('brightValText');
+    const volumeHud = document.getElementById('volumeHud');
+    const volumeBarFill = document.getElementById('volumeBarFill');
+    const volumeValText = document.getElementById('volumeValText');
+    const fsIcon = document.getElementById('fsIcon');
+    const lockStateBanner = document.getElementById('lockStateBanner');
+    const aspectRatioLabel = document.getElementById('aspectRatioLabel');
+    const sleepTimerBadge = document.getElementById('sleepTimerBadge');
+    const customSubtitleBox = document.getElementById('customSubtitleBox');
+    const playlistContainer = document.getElementById('playlistContainer');
+
+    // Default Sample Video Playlist (Royalty-free)
+    const playlist = [
+      {
+        id: 'bb_bunny',
+        title: 'Big Buck Bunny (Animation HD)',
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+        duration: '09:56',
+        badge: '1080P',
+        thumb: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80'
+      },
+      {
+        id: 'tears_steel',
+        title: 'Tears of Steel (Sci-Fi 4K)',
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+        duration: '12:14',
+        badge: '4K HDR',
+        thumb: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400&q=80'
+      },
+      {
+        id: 'sintel_movie',
+        title: 'Sintel - The Dragon Seeker',
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+        duration: '00:52',
+        badge: 'HD',
+        thumb: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=400&q=80'
+      },
+      {
+        id: 'elephant_dream',
+        title: 'Elephants Dream (Classic CGI)',
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+        duration: '10:53',
+        badge: '1080P',
+        thumb: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=400&q=80'
+      }
+    ];
+
+    let currentTrackIndex = 0;
+
+    // State Variables
+    let brightness = 1.0;          // 0.2 to 2.0
+    let volume = 1.0;              // 0.0 to 1.0
+    let currentSpeed = 1.0;
+    let isScreenLocked = false;
+    let controlsTimer = null;
+    let hudTimer = null;
+    let sleepTimerRef = null;
+    let sleepTimeMinutes = 0; // 0 = off, 15, 30, 45
+    let aspectModes = ['aspect-fit', 'aspect-fill', 'aspect-stretch', 'aspect-16-9'];
+    let aspectModeNames = ['Fit', 'Fill', 'Stretch', '16:9'];
+    let currentAspectIdx = 0;
+
+    // Audio Boost Context Simulator
+    let audioCtx = null;
+    let biquadFilter = null;
+    let isBassBoosted = false;
+
+    // =========================================================
+    // INITIALIZATION & PLAYLIST RENDER
+    // =========================================================
+    function initPlaylist() {
+      playlistContainer.innerHTML = '';
+      playlist.forEach((item, index) => {
+        const isActive = index === currentTrackIndex;
+        const el = document.createElement('div');
+        el.className = `p-2.5 rounded-xl border transition cursor-pointer flex items-center gap-3 ${
+          isActive 
+            ? 'bg-brand/10 border-brand text-white shadow-lg shadow-brand/10' 
+            : 'bg-surfaceLighter/60 hover:bg-surfaceLighter border-white/5 text-gray-300'
+        }`;
+        el.onclick = () => loadPlaylistItem(index);
+        el.innerHTML = `
+          <div class="relative w-16 h-12 rounded-lg overflow-hidden bg-black flex-shrink-0">
+            <img src="${item.thumb}" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/120x80/202028/ffffff?text=Video'">
+            <span class="absolute bottom-1 right-1 bg-black/80 text-[8px] px-1 rounded font-mono text-gray-200">${item.duration}</span>
+          </div>
+          <div class="flex-1 truncate">
+            <p class="text-xs font-semibold truncate ${isActive ? 'text-brand' : 'text-white'}">${item.title}</p>
+            <div class="flex items-center gap-1.5 mt-1 text-[10px] text-gray-400">
+              <span class="px-1 py-0.2 rounded bg-white/10 text-white font-mono">${item.badge}</span>
+              <span>•</span>
+              <span>Available</span>
+            </div>
+          </div>
+          ${isActive ? '<i class="fa-solid fa-chart-simple text-brand text-xs animate-pulse"></i>' : ''}
+        `;
+        playlistContainer.appendChild(el);
+      });
+    }
+
+    function loadPlaylistItem(index) {
+      if (index < 0 || index >= playlist.length) return;
+      currentTrackIndex = index;
+      const media = playlist[index];
+      
+      // Update UI Meta
+      document.getElementById('videoTitleDisplay').textContent = media.title;
+      document.getElementById('videoMetaHeading').textContent = media.title;
+      document.getElementById('metaResBadge').textContent = media.badge;
+
+      // Check Saved Progress
+      const savedTime = localStorage.getItem('apex_progress_' + media.id);
+
+      video.pause();
+      video.src = media.url;
+      video.load();
+
+      video.onloadedmetadata = () => {
+        if (savedTime && parseFloat(savedTime) < video.duration - 5) {
+          video.currentTime = parseFloat(savedTime);
+        }
+        applyPlaybackSpeed(currentSpeed);
+        video.play().catch(e => console.log('Autoplay restriction resolved:', e));
+      };
+
+      initPlaylist();
+    }
+
+    // =========================================================
+    // VIDEO PLAYBACK & PROGRESS HANDLERS
+    // =========================================================
+    function togglePlayPause() {
+      if (isScreenLocked) return;
+      if (video.paused || video.ended) {
+        video.play();
+      } else {
+        video.pause();
+      }
+      resetControlsTimer();
+    }
+
+    video.addEventListener('play', () => {
+      centerPlayIcon.className = 'fa-solid fa-pause text-xl sm:text-2xl';
+      resetControlsTimer();
+    });
+
+    video.addEventListener('pause', () => {
+      centerPlayIcon.className = 'fa-solid fa-play text-xl sm:text-2xl ml-0.5';
+      showControls();
+    });
+
+    video.addEventListener('timeupdate', () => {
+      if (!video.duration) return;
+      const cur = video.currentTime;
+      const dur = video.duration;
+      const pct = (cur / dur) * 100;
+      
+      progressFill.style.width = `${pct}%`;
+      scrubKnob.style.left = `${pct}%`;
+      curTimeDisplay.textContent = formatTime(cur);
+      durTimeDisplay.textContent = formatTime(dur);
+
+      // Save state in LocalStorage for auto-resume
+      const curMedia = playlist[currentTrackIndex];
+      if (curMedia) {
+        localStorage.setItem('apex_progress_' + curMedia.id, cur);
+      }
+    });
+
+    video.addEventListener('progress', () => {
+      if (video.buffered.length > 0 && video.duration) {
+        const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+        const buffPct = (bufferedEnd / video.duration) * 100;
+        bufferFill.style.width = `${buffPct}%`;
+      }
+    });
+
+    function formatTime(sec) {
+      if (isNaN(sec)) return "00:00";
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = Math.floor(sec % 60);
+      if (h > 0) {
+        return `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+      }
+      return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    // Scrubbing on Progress Bar
+    let isScrubbing = false;
+    function handleProgressScrub(e) {
+      const rect = progressBarTrack.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const pos = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      if (video.duration) {
+        video.currentTime = pos * video.duration;
+      }
+    }
+
+    progressBarTrack.addEventListener('click', (e) => {
+      if (isScreenLocked) return;
+      handleProgressScrub(e);
+    });
+
+    progressBarTrack.addEventListener('mousedown', (e) => {
+      if (isScreenLocked) return;
+      isScrubbing = true;
+      handleProgressScrub(e);
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (isScrubbing) handleProgressScrub(e);
+    });
+    window.addEventListener('mouseup', () => { isScrubbing = false; });
+
+    // =========================================================
+    // MX-STYLE SIGNATURE GESTURES (SWIPE, DOUBLE-TAP, 2X HOLD)
+    // =========================================================
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let lastTapTime = 0;
+    let holdTimer = null;
+    let isHolding2X = false;
+    let isVerticalSwipe = false;
+    let activeSwipeSide = null; // 'left' (bright) or 'right' (vol)
+
+    gestureSurface.addEventListener('touchstart', (e) => {
+      if (isScreenLocked) return;
+      const touch = e.touches[0];
+      const rect = playerContainer.getBoundingClientRect();
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+      isVerticalSwipe = false;
+
+      // Determine screen side
+      activeSwipeSide = (touch.clientX - rect.left) < (rect.width / 2) ? 'left' : 'right';
+
+      // Double-Tap Seek detection (< 300ms)
+      const now = Date.now();
+      if (now - lastTapTime < 300) {
+        clearTimeout(holdTimer);
+        const isRight = (touch.clientX - rect.left) > (rect.width / 2);
+        seekOffset(isRight ? 10 : -10);
+        showSeekRipple(isRight ? 'right' : 'left');
+        lastTapTime = 0;
+        return;
+      }
+      lastTapTime = now;
+
+      // Long press 2X Speed Hold trigger (450ms)
+      holdTimer = setTimeout(() => {
+        if (!video.paused) {
+          isHolding2X = true;
+          video.playbackRate = 2.0;
+          hold2XBadge.classList.remove('hidden');
+        }
+      }, 450);
+
+      resetControlsTimer();
+    }, { passive: true });
+
+    gestureSurface.addEventListener('touchmove', (e) => {
+      if (isScreenLocked) return;
+      const touch = e.touches[0];
+      const deltaY = touchStartY - touch.clientY; // Up = positive
+      const deltaX = Math.abs(touch.clientX - touchStartX);
+
+      if (Math.abs(deltaY) > 10 && Math.abs(deltaY) > deltaX) {
+        // Confirmed vertical swipe
+        isVerticalSwipe = true;
+        clearTimeout(holdTimer);
+
+        const sensitivity = 0.007;
+        if (activeSwipeSide === 'left') {
+          // Brightness Control
+          adjustBrightness(brightness + (deltaY * sensitivity));
+        } else {
+          // Volume Control
+          adjustVolume(volume + (deltaY * sensitivity));
+        }
+        touchStartY = touch.clientY;
+      }
+    }, { passive: true });
+
+    gestureSurface.addEventListener('touchend', endGesture);
+    gestureSurface.addEventListener('touchcancel', endGesture);
+
+    function endGesture() {
+      clearTimeout(holdTimer);
+      if (isHolding2X) {
+        applyPlaybackSpeed(currentSpeed);
+        hold2XBadge.classList.add('hidden');
+        isHolding2X = false;
+      }
+      if (!isVerticalSwipe) {
+        toggleControlsVisibility();
+      }
+      isVerticalSwipe = false;
+    }
+
+    // Mouse Fallbacks for Desktop
+    gestureSurface.addEventListener('click', (e) => {
+      if (isScreenLocked) return;
+      toggleControlsVisibility();
+    });
+
+    gestureSurface.addEventListener('dblclick', (e) => {
+      if (isScreenLocked) return;
+      const rect = playerContainer.getBoundingClientRect();
+      const isRight = (e.clientX - rect.left) > (rect.width / 2);
+      seekOffset(isRight ? 10 : -10);
+      showSeekRipple(isRight ? 'right' : 'left');
+    });
+
+    // =========================================================
+    // HUD CONTROLS (BRIGHTNESS, VOLUME, SEEK RIPPLES)
+    // =========================================================
+    function adjustBrightness(val) {
+      brightness = Math.max(0.2, Math.min(val, 2.0));
+      video.style.filter = `brightness(${brightness})`;
+      
+      const pct = Math.round((brightness / 2.0) * 100);
+      brightValText.textContent = `${pct}%`;
+      brightBarFill.style.height = `${pct}%`;
+
+      brightnessHud.classList.remove('hidden');
+      clearTimeout(hudTimer);
+      hudTimer = setTimeout(() => {
+        brightnessHud.classList.add('hidden');
+      }, 1200);
+    }
+
+    function adjustVolume(val) {
+      volume = Math.max(0, Math.min(val, 1.0));
+      video.volume = volume;
+
+      const pct = Math.round(volume * 100);
+      volumeValText.textContent = pct === 0 ? 'Mute' : `${pct}%`;
+      volumeBarFill.style.height = `${pct}%`;
+
+      volumeHud.classList.remove('hidden');
+      clearTimeout(hudTimer);
+      hudTimer = setTimeout(() => {
+        volumeHud.classList.add('hidden');
+      }, 1200);
+    }
+
+    function seekOffset(seconds) {
+      if (!video.duration) return;
+      video.currentTime = Math.max(0, Math.min(video.currentTime + seconds, video.duration));
+    }
+
+    function showSeekRipple(side) {
+      const el = side === 'left' ? leftSeekRipple : rightSeekRipple;
+      el.classList.remove('hidden');
+      el.classList.add('flex');
+      setTimeout(() => {
+        el.classList.add('hidden');
+        el.classList.remove('flex');
+      }, 650);
+    }
+
+    // =========================================================
+    // SPEED CONTROL SHEET (IMAGE 2 STYLE)
+    // =========================================================
+    function openSpeedSheet() {
+      if (isScreenLocked) return;
+      speedSheetBackdrop.classList.remove('hidden');
+      speedSheetBackdrop.classList.add('flex');
+      updateSpeedUI(currentSpeed);
+      hideControls();
+    }
+
+    function closeSpeedSheet() {
+      speedSheetBackdrop.classList.add('hidden');
+      speedSheetBackdrop.classList.remove('flex');
+      resetControlsTimer();
+    }
+
+    function applyPlaybackSpeed(spd) {
+      currentSpeed = parseFloat(spd);
+      video.playbackRate = currentSpeed;
+      updateSpeedUI(currentSpeed);
+    }
+
+    function onSpeedSliderInput(val) {
+      applyPlaybackSpeed(val);
+    }
+
+    function nudgeSpeed(delta) {
+      let next = Math.round((currentSpeed + delta) * 100) / 100;
+      next = Math.max(0.25, Math.min(next, 2.5));
+      applyPlaybackSpeed(next);
+    }
+
+    function selectSpeedPreset(preset) {
+      applyPlaybackSpeed(preset);
+    }
+
+    function updateSpeedUI(val) {
+      const fixedStr = Number(val).toFixed(2) + 'x';
+      const cleanLabel = (val % 1 === 0 ? Number(val).toFixed(1) : val) + 'x';
+
+      sheetSpeedVal.textContent = fixedStr;
+      currentSpeedLabel.textContent = cleanLabel;
+      speedSlider.value = val;
+
+      // Update Pill styles
+      document.querySelectorAll('.speed-pill').forEach(btn => {
+        const pVal = parseFloat(btn.textContent.trim());
+        if (Math.abs(pVal - val) < 0.02) {
+          btn.className = "speed-pill py-2 rounded-xl bg-brand text-black font-bold border border-brand shadow-lg shadow-brand/20";
+        } else {
+          btn.className = "speed-pill py-2 rounded-xl bg-surfaceLighter hover:bg-white/15 text-gray-300 font-semibold border border-white/5";
+        }
+      });
+    }
+
+    // =========================================================
+    // TRUE FULLSCREEN & PICTURE-IN-PICTURE
+    // =========================================================
+    async function toggleProFullscreen() {
+      const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+      try {
+        if (!isFs) {
+          if (playerContainer.requestFullscreen) {
+            await playerContainer.requestFullscreen();
+          } else if (playerContainer.webkitRequestFullscreen) {
+            await playerContainer.webkitRequestFullscreen();
+          }
+        } else {
+          if (document.exitFullscreen) {
+            await document.exitFullscreen();
+          } else if (document.webkitExitFullscreen) {
+            await document.webkitExitFullscreen();
+          }
+        }
+      } catch (e) {
+        console.error('Fullscreen toggling error:', e);
+      }
+    }
+
+    function handleFullscreenChange() {
+      const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+      if (isFs) {
+        fsIcon.className = "fa-solid fa-compress text-base";
+      } else {
+        fsIcon.className = "fa-solid fa-expand text-base";
+      }
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+    async function togglePictureInPicture() {
+      try {
+        if (!document.pictureInPictureEnabled) {
+          return;
+        }
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+        } else {
+          await video.requestPictureInPicture();
+        }
+      } catch (err) {
+        console.error('PiP Error:', err);
+      }
+    }
+
+    // =========================================================
+    // ASPECT RATIO & SCREEN LOCK
+    // =========================================================
+    function cycleAspectRatio() {
+      if (isScreenLocked) return;
+      // remove old class
+      video.classList.remove(...aspectModes);
+      currentAspectIdx = (currentAspectIdx + 1) % aspectModes.length;
+      video.classList.add(aspectModes[currentAspectIdx]);
+      aspectRatioLabel.textContent = aspectModeNames[currentAspectIdx];
+      resetControlsTimer();
+    }
+
+    function toggleScreenLock() {
+      isScreenLocked = !isScreenLocked;
+      if (isScreenLocked) {
+        hideControls();
+        lockStateBanner.classList.remove('hidden');
+      } else {
+        lockStateBanner.classList.add('hidden');
+        showControls();
+      }
+    }
+
+    // =========================================================
+    // SLEEP TIMER FEATURE
+    // =========================================================
+    function cycleSleepTimer() {
+      if (isScreenLocked) return;
+      if (sleepTimeMinutes === 0) sleepTimeMinutes = 15;
+      else if (sleepTimeMinutes === 15) sleepTimeMinutes = 30;
+      else if (sleepTimeMinutes === 30) sleepTimeMinutes = 45;
+      else sleepTimeMinutes = 0;
+
+      clearTimeout(sleepTimerRef);
+      if (sleepTimeMinutes > 0) {
+        sleepTimerBadge.textContent = `${sleepTimeMinutes}m`;
+        sleepTimerBadge.classList.remove('hidden');
+        sleepTimerRef = setTimeout(() => {
+          video.pause();
+          sleepTimerBadge.classList.add('hidden');
+          sleepTimeMinutes = 0;
+        }, sleepTimeMinutes * 60 * 1000);
+      } else {
+        sleepTimerBadge.classList.add('hidden');
+      }
+    }
+
+    // =========================================================
+    // BASS BOOST SIMULATION (WEB AUDIO API)
+    // =========================================================
+    function toggleAudioBoost() {
+      try {
+        if (!audioCtx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          audioCtx = new AudioContext();
+          const source = audioCtx.createMediaElementSource(video);
+          biquadFilter = audioCtx.createBiquadFilter();
+          biquadFilter.type = "lowshelf";
+          biquadFilter.frequency.value = 200; // Bass freq
+          biquadFilter.gain.value = 0;
+
+          source.connect(biquadFilter);
+          biquadFilter.connect(audioCtx.destination);
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+
+        isBassBoosted = !isBassBoosted;
+        if (isBassBoosted) {
+          biquadFilter.gain.value = 8.5; // +8.5dB bass
+          document.getElementById('bassBoostText').textContent = 'Heavy (+8dB)';
+          document.getElementById('bassBoostText').className = 'text-brand font-bold';
+        } else {
+          biquadFilter.gain.value = 0;
+          document.getElementById('bassBoostText').textContent = 'Off';
+          document.getElementById('bassBoostText').className = 'text-white font-normal';
+        }
+      } catch (e) {
+        console.log('Audio Context error or already linked:', e);
+      }
+    }
+
+    // =========================================================
+    // SUBTITLES & LOCAL FILES
+    // =========================================================
+    function toggleSubtitles() {
+      const track = video.textTracks[0];
+      if (track) {
+        if (track.mode === 'showing') {
+          track.mode = 'disabled';
+          document.getElementById('subBtn').classList.remove('text-brand');
+        } else {
+          track.mode = 'showing';
+          document.getElementById('subBtn').classList.add('text-brand');
+        }
+      }
+    }
+
+    // Local Subtitle File Upload
+    document.getElementById('subtitleFileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      const track = document.getElementById('mainTrack');
+      track.src = url;
+      track.mode = 'showing';
+      document.getElementById('subBtn').classList.add('text-brand');
+    });
+
+    // Local Video File Upload
+    document.getElementById('localFileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const fileUrl = URL.createObjectURL(file);
+      
+      // Add to playlist
+      const localItem = {
+        id: 'local_' + Date.now(),
+        title: file.name.replace(/\.[^/.]+$/, ""),
+        url: fileUrl,
+        duration: 'Local',
+        badge: 'Local Disk',
+        thumb: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&q=80'
+      };
+      playlist.unshift(localItem);
+      initPlaylist();
+      loadPlaylistItem(0);
+    });
+
+    // =========================================================
+    // URL STREAM MODAL
+    // =========================================================
+    function toggleUrlModal() {
+      const modal = document.getElementById('urlModal');
+      modal.classList.toggle('hidden');
+      modal.classList.toggle('flex');
+    }
+
+    function submitModalUrl() {
+      const url = document.getElementById('modalUrlInput').value.trim();
+      if (!url) return;
+      playCustomUrl(url);
+      toggleUrlModal();
+    }
+
+    function loadFromInputUrl() {
+      const url = document.getElementById('quickUrlInput').value.trim();
+      if (!url) return;
+      playCustomUrl(url);
+    }
+
+    function playCustomUrl(url) {
+      let name = 'Online Stream';
+      try {
+        const u = new URL(url);
+        name = u.pathname.split('/').pop() || 'Web Stream';
+      } catch(e){}
+
+      const item = {
+        id: 'stream_' + Date.now(),
+        title: decodeURIComponent(name),
+        url: url,
+        duration: 'Stream',
+        badge: 'WEB',
+        thumb: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80'
+      };
+      playlist.unshift(item);
+      initPlaylist();
+      loadPlaylistItem(0);
+    }
+
+    // =========================================================
+    // CONTROLS AUTO-HIDE & VISIBILITY
+    // =========================================================
+    function showControls() {
+      if (isScreenLocked) return;
+      controlsOverlay.style.opacity = '1';
+      controlsOverlay.style.pointerEvents = 'auto';
+      resetControlsTimer();
+    }
+
+    function hideControls() {
+      if (video.paused) return;
+      controlsOverlay.style.opacity = '0';
+      controlsOverlay.style.pointerEvents = 'none';
+    }
+
+    function toggleControlsVisibility() {
+      if (isScreenLocked) return;
+      if (controlsOverlay.style.opacity === '0') {
+        showControls();
+      } else {
+        hideControls();
+      }
+    }
+
+    function resetControlsTimer() {
+      clearTimeout(controlsTimer);
+      controlsTimer = setTimeout(() => {
+        hideControls();
+      }, 3500);
+    }
+
+    playerContainer.addEventListener('mousemove', () => {
+      showControls();
+    });
+
+    // Start App
+    window.onload = function() {
+      initPlaylist();
+      loadPlaylistItem(0);
+      resetControlsTimer();
+    };
+  </script>
+
+</body>
+</html>
+```
