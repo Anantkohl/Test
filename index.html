@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Online Video Player</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #0f0f0f;
+      color: #ffffff;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .player-container {
+      width: 90%;
+      max-width: 900px;
+      background: #1c1c1c;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+    h2 {
+      font-size: 1.1rem;
+      margin-bottom: 12px;
+      word-break: break-all;
+    }
+    /* वीडियो और ओवरले कंटेनर */
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    video {
+      width: 100%;
+      height: auto;
+      display: block;
+      outline: none;
+    }
+    /* 2X स्पीड बैज */
+    .speed-badge {
+      display: none;
+      position: absolute;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.75);
+      color: #ffd700;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: bold;
+      border: 1px solid #ffd700;
+      z-index: 10;
+      pointer-events: none;
+    }
+    /* डबल-टैप रिपल/एनिमेशन बैज */
+    .tap-indicator {
+      display: none;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0, 0, 0, 0.65);
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 30px;
+      font-size: 15px;
+      font-weight: bold;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .tap-indicator.left {
+      left: 15%;
+    }
+    .tap-indicator.right {
+      right: 15%;
+    }
+    /* नीचे के बटन */
+    .controls-btn-container {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 15px;
+    }
+    .seek-btn {
+      background-color: #2b2b2b;
+      color: #ffffff;
+      border: 1px solid #444;
+      padding: 10px 20px;
+      font-size: 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .seek-btn:hover {
+      background-color: #3d3d3d;
+      border-color: #666;
+    }
+    .seek-btn:active {
+      transform: scale(0.97);
+    }
+    /* चैनल नाम (RAVI KOHLI) स्टाइल */
+    .channel-branding {
+      margin-top: 18px;
+      text-align: center;
+      padding-top: 12px;
+      border-top: 1px solid #2a2a2a;
+    }
+    .channel-title {
+      font-size: 1.15rem;
+      font-weight: bold;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #ff416c, #ff4b2b, #ffb300);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: inline-block;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .channel-sub {
+      font-size: 0.8rem;
+      color: #888;
+      margin-top: 3px;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="player-container">
+    <!-- टाइटल अपने आप अपडेट होगा -->
+    <h2 id="movieTitle">Loading Stream...</h2>
+    
+    <div class="video-wrapper" id="videoBox">
+      <!-- 2X स्पीड इंडिकेटर -->
+      <div class="speed-badge" id="speedBadge">⏩ 2X Speed</div>
+
+      <!-- डबल टैप इंडिकेटर -->
+      <div class="tap-indicator left" id="leftBadge">⏪ 10s</div>
+      <div class="tap-indicator right" id="rightBadge">10s ⏩</div>
+
+      <video id="myVideo" controls preload="metadata">
+        <source id="videoSource" src="https://video-downloads.googleusercontent.com/ADGPM2m3Mj_-mi3bvRoy3LdIEKbvpMABZ0d274_YvVoMD_2AauMIdvjLmvYcKtvnNG2mUUABJAqv7Fu2P_yOtamBDAqg9jNBShzvcL7l5ZIymofeVpOC_pqlpw4HfpL1NhF56j437idnGFG91wyWn0_Fr1_xfi1xaMM8mRgyF-CUHoJVOI_DezuOZ5NUBDbZ03tHNKAZg4eQDAVk_ovMCfW4hLPMZjOIArRnv-7V7JPm3V8zmS5HvzmM9Ucz5AvrdVwq-BwUs2gqVs1Ev4qAYvoH3L_73KaCTw" type="video/mp4">
+        आपका ब्राउज़र इस वीडियो फ़ाइल को सीधे चलाने का समर्थन नहीं करता है।
+      </video>
+    </div>
+
+    <!-- बटन कंट्रोल्स -->
+    <div class="controls-btn-container">
+      <button class="seek-btn" onclick="seekVideo(-10)">⏪ 10 सेकंड पीछे</button>
+      <button class="seek-btn" onclick="seekVideo(10)">10 सेकंड आगे ⏩</button>
+    </div>
+
+    <!-- चैनल नाम और टेलीग्राम लिंक -->
+    <div class="channel-branding">
+      <a href="https://t.me/tg_kkg" target="_blank" rel="noopener noreferrer" class="channel-title">🎬 RAVI KOHLI</a>
+      <div class="channel-sub">Official Channel</div>
+    </div>
+  </div>
+
+  <script>
+    const video = document.getElementById('myVideo');
+    const videoSource = document.getElementById('videoSource');
+    const movieTitle = document.getElementById('movieTitle');
+    const videoBox = document.getElementById('videoBox');
+    const speedBadge = document.getElementById('speedBadge');
+    const leftBadge = document.getElementById('leftBadge');
+    const rightBadge = document.getElementById('rightBadge');
+
+    // यूआरएल से ऑटोमैटिक नाम निकालने का फंक्शन
+    function autoSetMovieTitle() {
+      try {
+        const rawUrl = videoSource.getAttribute('src') || video.currentSrc;
+        if (!rawUrl) return;
+
+        const urlObj = new URL(rawUrl, window.location.href);
+
+        // प्राथमिकता 1: query parameter से 'response-content-disposition' चेक करना
+        let filename = urlObj.searchParams.get('response-content-disposition');
+
+        // प्राथमिकता 2: पाथ से फ़ाइल का नाम निकालना
+        if (!filename) {
+          const pathname = urlObj.pathname;
+          filename = pathname.substring(pathname.lastIndexOf('/') + 1);
+        }
+
+        if (filename) {
+          filename = decodeURIComponent(filename);
+
+          // फ़ाइल एक्सटेंशन (.mkv, .mp4 आदि) हटाना
+          let cleanName = filename.replace(/\.(mp4|mkv|avi|webm|mov|flv)$/i, '');
+
+          // डॉट्स और अंडरस्कोर को स्पेस में बदलना
+          cleanName = cleanName.replace(/[._]/g, ' ').trim();
+
+          // हेडिंग और पेज का टाइटल ऑटो-अपडेट करना
+          movieTitle.textContent = cleanName + " (Online Stream)";
+          document.title = cleanName + " - Online Video Player";
+        }
+      } catch (e) {
+        console.error("टाइटल लोड करने में समस्या:", e);
+      }
+    }
+
+    // पेज लोड होते ही टाइटल सेट करें
+    autoSetMovieTitle();
+
+    let pressTimer = null;
+    let isHoldingFast = false;
+    let lastTapTime = 0;
+    let badgeTimeout = null;
+
+    // स्किप फ़ंक्शन
+    function seekVideo(seconds) {
+      if (video) {
+        video.currentTime = Math.max(0, Math.min(video.currentTime + seconds, video.duration || Infinity));
+      }
+    }
+
+    // विज़ुअल बैज दिखाना
+    function showBadge(badge) {
+      clearTimeout(badgeTimeout);
+      leftBadge.style.display = 'none';
+      rightBadge.style.display = 'none';
+      badge.style.display = 'block';
+      badgeTimeout = setTimeout(() => {
+        badge.style.display = 'none';
+      }, 600);
+    }
+
+    // 2X स्पीड शुरू
+    function startFast() {
+      if (video && !video.paused) {
+        isHoldingFast = true;
+        video.playbackRate = 2.0;
+        speedBadge.style.display = 'block';
+      }
+    }
+
+    // स्पीड वापस 1x
+    function endFast() {
+      clearTimeout(pressTimer);
+      if (isHoldingFast) {
+        video.playbackRate = 1.0;
+        speedBadge.style.display = 'none';
+        isHoldingFast = false;
+      }
+    }
+
+    // टच / क्लिक पॉज़िशन से तय करना
+    function handleTap(clientX) {
+      const rect = videoBox.getBoundingClientRect();
+      const clickX = clientX - rect.left;
+      const isRightSide = clickX > rect.width / 2;
+
+      const now = Date.now();
+      if (now - lastTapTime < 320) {
+        clearTimeout(pressTimer);
+        if (isRightSide) {
+          seekVideo(10);
+          showBadge(rightBadge);
+        } else {
+          seekVideo(-10);
+          showBadge(leftBadge);
+        }
+        lastTapTime = 0;
+      } else {
+        lastTapTime = now;
+      }
+    }
+
+    // मोबाइल टच इवेंट्स
+    videoBox.addEventListener('touchstart', (e) => {
+      const touch = e.touches[0];
+      handleTap(touch.clientX);
+      pressTimer = setTimeout(startFast, 400);
+    }, { passive: true });
+
+    videoBox.addEventListener('touchend', endFast);
+    videoBox.addEventListener('touchcancel', endFast);
+
+    // डेस्कटॉप माउस इवेंट्स
+    videoBox.addEventListener('mousedown', (e) => {
+      handleTap(e.clientX);
+      pressTimer = setTimeout(startFast, 400);
+    });
+
+    videoBox.addEventListener('mouseup', endFast);
+    videoBox.addEventListener('mouseleave', endFast);
+  </script>
+
+</body>
+</html>
